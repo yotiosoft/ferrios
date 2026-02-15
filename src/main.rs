@@ -17,6 +17,7 @@ use ferrios::memory;
 use ferrios::allocator;
 use ferrios::task::{ Task, executor::Executor };
 use ferrios::process;
+use ferrios::{QemuExitCode, exit_qemu, serial_println, serial_print};
 
 entry_point!(kernel_main);
 
@@ -25,7 +26,12 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     use ferrios::memory::BootInfoFrameAllocator;
     use x86_64::{ structures::paging::Page, structures::paging::Translate, VirtAddr };
 
-    println!("Hello World{}", "!");
+    {
+        use ferrios::serial::SERIAL1;
+        SERIAL1.lock();  // これでlazy_staticが初期化される
+    }
+
+    serial_println!("Hello World{}", "!");
 
     ferrios::init();
 
@@ -59,7 +65,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     for &address in &addresses {
         let virt = VirtAddr::new(address);
         let phys = mapper.translate_addr(virt);
-        println!("{:?} -> {:?}", virt, phys);
+        serial_println!("{:?} -> {:?}", virt, phys);
     }
 
     // allocator 初期化
@@ -67,23 +73,23 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     // allocates
     let x = Box::new(41);
-    println!("heap_value at {:p}", x);
+    serial_println!("heap_value at {:p}", x);
     let mut vec = Vec::new();
     for i in 0..500 {
         vec.push(i);
     }
-    println!("vec at {:p}", vec.as_slice());
+    serial_println!("vec at {:p}", vec.as_slice());
     // 参照されたベクタを作成する → カウントが0になると解放される
     let reference_counted = Rc::new(vec![1, 2, 3]);
     let cloned_reference = reference_counted.clone();
-    println!("current reference count is {}", Rc::strong_count(&cloned_reference));
+    serial_println!("current reference count is {}", Rc::strong_count(&cloned_reference));
     core::mem::drop(reference_counted);
-    println!("reference count is {} now", Rc::strong_count(&cloned_reference));
+    serial_println!("reference count is {} now", Rc::strong_count(&cloned_reference));
 
     #[cfg(test)]
     test_main();
     
-    println!("It did not crash!");
+    serial_println!("It did not crash!");
     
     // カーネルスレッド作成
     process::create_kernel_thread(kernel_thread_1, 1);
@@ -95,9 +101,11 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
 // カーネルスレッド
 fn kernel_thread_1() -> ! {
+    let mut count = 0;
     loop {
         // 割り込みが有効か確認
-        println!("Thread 1 running");
+        serial_println!("Thread 1 running: {}", count);
+        count = count + 1;
         
         for _ in 0..1000000 {
             unsafe { core::arch::asm!("nop"); }
@@ -105,9 +113,11 @@ fn kernel_thread_1() -> ! {
     }
 }
 fn kernel_thread_2() -> ! {
+    let mut count = 0;
     loop {
         // 割り込みが有効か確認
-        println!("Thread 2 running");
+        serial_println!("Thread 2 running: {}", count);
+        count = count + 1;
         
         for _ in 0..1000000 {
             unsafe { core::arch::asm!("nop"); }
