@@ -36,7 +36,7 @@ impl Console {
         }
     }
 
-    pub fn mode_selector(&self) -> ConsoleMode {
+    pub fn update_mode(&self) -> ConsoleMode {
         if Self::detect_serial() {
             ConsoleMode::Both
         }
@@ -50,15 +50,19 @@ lazy_static! {
     static ref CONSOLE: Mutex<Console> = Mutex::new(Console::new());
 }
 
+pub fn init() {
+    let console = CONSOLE.lock();
+    console.update_mode();
+}
+
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
 
     // ロック中の割り込みを防止
     interrupts::without_interrupts(|| {
         let console = CONSOLE.lock();
-        let mode = console.mode_selector();
 
-        match mode {
+        match console.mode {
             ConsoleMode::Serial => {
                 serial::_print(args);
             },

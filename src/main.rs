@@ -18,6 +18,7 @@ use ferrios::memory;
 use ferrios::allocator;
 use ferrios::task::{ Task, executor::Executor };
 use ferrios::process;
+use ferrios::console;
 
 entry_point!(kernel_main);
 
@@ -31,6 +32,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     print!("Initializing..");
     ferrios::init();
+    console::init();
     println!("done.");
 
     println!("Checking Virtual Memory..");
