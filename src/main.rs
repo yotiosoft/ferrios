@@ -106,7 +106,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("done.");
 
     println!("Starting the scheduler..");
-    process::scheduler::get_scheduler().scheduler();
+    process::scheduler::scheduler();
 }
 
 // カーネルスレッド

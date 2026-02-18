@@ -1,5 +1,5 @@
 use super::{ Process, ProcessState, PROCESS_TABLE, NPROC };
-use super::context::{ self, Context, switch_context };
+use super::context;
 use crate::cpu;
 use lazy_static::lazy_static;
 use conquer_once::spin::OnceCell;
@@ -22,10 +22,14 @@ pub trait Scheduler: Send + Sync {
     fn on_yield(&self);
 }
 
-pub fn get_scheduler() -> &'static dyn Scheduler {
+fn get_scheduler() -> &'static dyn Scheduler {
     SCHEDULER.get()
         .expect("Scheduler not initialized")
         .as_ref()
+}
+
+pub fn scheduler() -> ! {
+    get_scheduler().scheduler();
 }
 
 pub fn yield_from_context() {
