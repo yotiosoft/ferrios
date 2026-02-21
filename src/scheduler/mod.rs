@@ -1,11 +1,11 @@
-use crate::thread::{ Thread, ThreadState, THREAD_TABLE, NPROC };
+use crate::thread::{ Thread, ThreadState, THREAD_TABLE, NTHREAD };
 use crate::cpu;
 use lazy_static::lazy_static;
 use conquer_once::spin::OnceCell;
 use alloc::boxed::Box;
 
-pub mod round_robin;
 pub mod context;
+pub mod round_robin;
 
 lazy_static! {
     static ref CPU: spin::Mutex<cpu::Cpu> = spin::Mutex::new(cpu::Cpu::new(0));

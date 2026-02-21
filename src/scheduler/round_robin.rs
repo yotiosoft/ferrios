@@ -1,4 +1,4 @@
-use super::{ Thread, ThreadState, THREAD_TABLE, NPROC, CPU, SCHEDULER_STARTED };
+use super::{ Thread, ThreadState, THREAD_TABLE, NTHREAD, CPU, SCHEDULER_STARTED };
 use super::context::{ Context, switch_context };
 
 pub struct RoundRobin;
@@ -17,9 +17,9 @@ impl super::Scheduler for RoundRobin {
             let mut table = THREAD_TABLE.lock();
             let mut cpu = CPU.lock();
             
-            // 次に実行するプロセスの決定
+            // 次に実行するスレッドの決定
             let next_pid = {
-                find_next_runnable_process(&table, cpu.current_pid)
+                find_next_runnable_thread(&table, cpu.current_pid)
             };
 
             match next_pid {
@@ -75,7 +75,7 @@ impl super::Scheduler for RoundRobin {
         }
         let current_pid = current_pid.unwrap();
         if table[current_pid].state != ThreadState::Running {
-            panic!("CPU has current_pid but the process is not Running");
+            panic!("CPU has current_pid but the thread is not Running");
         }
 
         let (old_context, new_context) = {
@@ -98,10 +98,10 @@ impl super::Scheduler for RoundRobin {
     }
 }
 
-fn find_next_runnable_process(table: &[Thread; NPROC], current_pid: Option<usize>) -> Option<usize> {
+fn find_next_runnable_thread(table: &[Thread; NTHREAD], current_pid: Option<usize>) -> Option<usize> {
     let current_pid = current_pid.unwrap_or(0);
-    for i in 1..NPROC+1 {
-        let pid = (current_pid + i) % NPROC;
+    for i in 1..NTHREAD+1 {
+        let pid = (current_pid + i) % NTHREAD;
         if table[pid].state == ThreadState::Runnable {
             return Some(pid);
         }
