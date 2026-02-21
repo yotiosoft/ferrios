@@ -1,4 +1,4 @@
-use super::{ next_tid, STACK_SIZE, PROCESS_TABLE, ProcessState };
+use super::{ next_tid, STACK_SIZE, THREAD_TABLE, ThreadState };
 
 /// カーネルスレッド作成
 pub fn create_kernel_thread(entry: fn() -> !) {
@@ -12,9 +12,9 @@ pub fn create_kernel_thread(entry: fn() -> !) {
     };
     let stack_top = stack as u64 + STACK_SIZE as u64;
 
-    let mut table = PROCESS_TABLE.lock();
+    let mut table = THREAD_TABLE.lock();
     table[pid].tid = pid;
-    table[pid].state = ProcessState::Runnable;
+    table[pid].state = ThreadState::Runnable;
     table[pid].kstack = stack_top;
 
     // コンテキストを初期化する

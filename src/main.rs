@@ -18,7 +18,7 @@ use ferrios::memory;
 use ferrios::allocator;
 use ferrios::task::{ Task, executor::Executor };
 use ferrios::thread;
-use ferrios::thread::scheduler;
+use ferrios::scheduler;
 use ferrios::console;
 
 entry_point!(kernel_main);
@@ -106,7 +106,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("done.");
 
     println!("Starting the scheduler..");
-    thread::scheduler::scheduler();
+    scheduler::scheduler();
 }
 
 // カーネルスレッド
