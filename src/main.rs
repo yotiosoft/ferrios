@@ -18,6 +18,7 @@ use ferrios::memory;
 use ferrios::allocator;
 use ferrios::task::{ Task, executor::Executor };
 use ferrios::thread;
+use ferrios::process;
 use ferrios::scheduler;
 use ferrios::console;
 
@@ -104,6 +105,16 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     thread::create_kernel_thread(kernel_thread_1);
     thread::create_kernel_thread(keyboard_and_serial_input_thread);
     println!("done.");
+
+    // ユーザプロセス作成
+    process::map_user_pages(&mut mapper, &mut frame_allocator).expect("failed to map user pages");
+    process::copy_user_code_to_memory();
+    unsafe {
+        process::jump_to_usermode(
+            ferrios::gdt::GDT.1.user_code_selector,
+            ferrios::gdt::GDT.1.user_data_selector,
+        );
+    }
 
     println!("Starting the scheduler..");
     scheduler::scheduler();

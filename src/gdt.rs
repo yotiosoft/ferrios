@@ -35,13 +35,13 @@ lazy_static! {
 pub struct Selectors {
     kernel_code_selector: SegmentSelector,
     kernel_data_selector: SegmentSelector,
-    user_code_selector: SegmentSelector,
-    user_data_selector: SegmentSelector,
+    pub user_code_selector: SegmentSelector,
+    pub user_data_selector: SegmentSelector,
     tss_selector: SegmentSelector,
 }
 
 lazy_static! {
-    static ref GDT: (GlobalDescriptorTable, Selectors) = {
+    pub static ref GDT: (GlobalDescriptorTable, Selectors) = {
         let mut gdt = GlobalDescriptorTable::new();
         let kernel_code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
         let kernel_data_selector = gdt.add_entry(Descriptor::kernel_data_segment());
