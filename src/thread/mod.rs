@@ -2,6 +2,7 @@ use crate::scheduler;
 use scheduler::context::Context;
 
 pub mod kthread;
+pub mod uthread;
 
 extern crate alloc;
 
