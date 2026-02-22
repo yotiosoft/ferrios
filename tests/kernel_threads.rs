@@ -30,8 +30,8 @@ fn main(boot_info: &'static BootInfo) -> ! {
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
     // カーネルスレッド作成
-    thread::create_kernel_thread(kernel_thread_0);
-    thread::create_kernel_thread(kernel_thread_1);
+    thread::kthread::create_kernel_thread(kernel_thread_0);
+    thread::kthread::create_kernel_thread(kernel_thread_1);
 
     scheduler::scheduler();
 }

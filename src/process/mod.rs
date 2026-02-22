@@ -21,6 +21,9 @@ pub fn create_user_process(user_cs: SegmentSelector, user_ss: SegmentSelector) {
     // スレッド ID を確保
     let tid = thread::next_tid().expect("Thread table is full");
 
+    // ユーザページのフラグ
+    let user_flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
+
     // カーネルスタックを作成
     let stack = unsafe {
         let layout = alloc::alloc::Layout::from_size_align(thread::STACK_SIZE, 16).unwrap();

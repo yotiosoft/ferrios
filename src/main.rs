@@ -101,9 +101,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     
     // カーネルスレッド作成
     print!("Starting kernel threads..");
-    thread::create_kernel_thread(kernel_thread_0);
-    thread::create_kernel_thread(kernel_thread_1);
-    thread::create_kernel_thread(keyboard_and_serial_input_thread);
+    thread::kthread::create_kernel_thread(kernel_thread_0);
+    thread::kthread::create_kernel_thread(kernel_thread_1);
+    thread::kthread::create_kernel_thread(keyboard_and_serial_input_thread);
     println!("done.");
 
     // ユーザプロセス作成
