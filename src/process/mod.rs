@@ -1,6 +1,8 @@
 use x86_64::{ VirtAddr, structures::paging::{ FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB } };
 use x86_64::structures::gdt::SegmentSelector;
 
+use crate::thread;
+
 /// ユーザコード
 pub const USER_CODE_START: u64 = 0x0000_1000_0000_0000;
 
@@ -14,6 +16,29 @@ static USER_CODE: &[u8] = &[
     0x48, 0xFF, 0xC0,           // inc rax
     0xEB, 0xFB,                 // jmp -5
 ];
+
+pub fn create_user_process(user_cs: SegmentSelector, user_ss: SegmentSelector) {
+    // スレッド ID を確保
+    let tid = thread::next_tid().expect("Thread table is full");
+
+    // カーネルスタックを作成
+    let stack = unsafe {
+        let layout = alloc::alloc::Layout::from_size_align(thread::STACK_SIZE, 16).unwrap();
+        alloc::alloc::alloc(layout)
+    };
+    let stack_top = stack as u64 + thread::STACK_SIZE as u64;
+
+    let mut table = thread::THREAD_TABLE.lock();
+    table[tid].tid = tid;
+    table[tid].state = thread::ThreadState::Runnable;
+    table[tid].kstack = stack_top;
+
+    // コンテキストを初期化する
+    let entry = jump_to_usermode;
+    table[tid].context.rsp = stack_top;
+    table[tid].context.rip = entry as u64;
+    table[tid].context.rflags = 0x200;  // IF (Interrupt Flag) を有効化
+}
 
 pub fn map_user_pages(mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl FrameAllocator<Size4KiB>) -> Result<(), &'static str> {
     // ユーザページのフラグ
@@ -50,32 +75,27 @@ pub fn copy_user_code_to_memory() {
     }
 }
 
-pub unsafe fn jump_to_usermode(
-    user_cs: SegmentSelector,
-    user_ss: SegmentSelector,
-) -> ! {
+pub unsafe fn jump_to_usermode(user_cs: SegmentSelector, user_ss: SegmentSelector) -> ! {
     let code_ptr = USER_CODE_START;
     let stack_ptr = USER_STACK_TOP;
 
     unsafe {
         core::arch::asm!(
-            // セグメントレジスタを一旦カーネルデータで埋める（iretq前の準備）
-            "mov ax, {user_ss}",
-            "mov ds, ax",
+            "mov ds, ax",   // ax には user_ss が入っている（後述）
             "mov es, ax",
-            // iretq用スタックフレームを積む
-            "push {user_ss}",   // SS
-            "push {rsp}",       // RSP（ユーザスタック）
-            "push {rflags}",    // RFLAGS（IF=1）
-            "push {user_cs}",   // CS
-            "push {rip}",       // RIP（ユーザコード）
+            "push rax",     // SS
+            "push {rsp}",   // RSP
+            "push {rflags}",// RFLAGS
+            "push {user_cs}",// CS
+            "push {rip}",   // RIP
             "iretq",
-            user_ss  = in(reg) user_ss.0 as u64,
+            inout("ax") user_ss.0 => _,
             user_cs  = in(reg) user_cs.0 as u64,
             rsp      = in(reg) stack_ptr,
             rip      = in(reg) code_ptr,
-            rflags   = in(reg) 0x202u64, // IF=1, 予約ビット=1
-            options(noreturn),
+            rflags   = in(reg) 0x202u64,
         );
     }
+
+    loop {}
 }
