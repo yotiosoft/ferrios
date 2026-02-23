@@ -18,7 +18,6 @@ use ferrios::memory;
 use ferrios::allocator;
 use ferrios::task::{ Task, executor::Executor };
 use ferrios::thread;
-use ferrios::process;
 use ferrios::scheduler;
 use ferrios::console;
 
@@ -113,7 +112,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         0xEB, 0xFB,                 // jmp -5
     ];
 
-    thread::uthread::create_user_process(USER_CODE, &mut mapper, &mut frame_allocator).expect("failed to create user process");
+    thread::uprocess::create_user_process(USER_CODE, &mut mapper, &mut frame_allocator).expect("failed to create user process");
 
     println!("Starting the scheduler..");
     scheduler::scheduler();

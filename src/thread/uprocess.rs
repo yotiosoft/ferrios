@@ -1,4 +1,7 @@
+use core::slice::SliceIndex;
+
 use x86_64::{ VirtAddr, structures::paging::{ FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB } };
+use lazy_static::lazy_static;
 use crate::gdt;
 
 use super::{ STACK_SIZE, THREAD_TABLE, ThreadState };
@@ -9,6 +12,11 @@ pub const USER_CODE_START: u64 = 0x0000_1000_0000_0000;
 /// ユーザスタック
 pub const USER_STACK_TOP: u64 = 0x0000_2000_0000_0000;
 pub const USER_STACK_PAGES: u64 = 4;
+
+lazy_static! {
+    /// Process ID
+    static ref NEXT_PID: spin::Mutex<usize> = spin::Mutex::new(0);
+}
 
 pub fn create_user_process(code: &[u8], mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl FrameAllocator<Size4KiB>) -> Result<(), &'static str> {
     // スレッド ID を確保
@@ -45,7 +53,9 @@ pub fn create_user_process(code: &[u8], mapper: &mut impl Mapper<Size4KiB>, fram
     let kstack_top = kstack as u64 + STACK_SIZE as u64;
 
     let mut table = THREAD_TABLE.lock();
+    let mut pid = NEXT_PID.lock();
     table[tid].tid = tid;
+    table[tid].pid = *pid;
     table[tid].state = ThreadState::Runnable;
     table[tid].kstack = kstack_top;
 
@@ -56,6 +66,8 @@ pub fn create_user_process(code: &[u8], mapper: &mut impl Mapper<Size4KiB>, fram
     table[tid].context.cs = gdt::GDT.1.user_code_selector.0 as u64;
     table[tid].context.ss = gdt::GDT.1.user_data_selector.0 as u64;
     table[tid].context.rsp3 = USER_STACK_TOP;
+
+    *pid += 1;
 
     Ok(())
 }
@@ -76,7 +88,7 @@ unsafe extern "C" fn ring3_entry_trampoline() -> ! {
             "push {rflags}",
             "push {cs}",
             "push {rip}",
-            "iretq",
+            "iretq",            // switch: cs, ss, rsp, rflags
             inout("ax") ss => _,
             cs = in(reg) cs,
             rsp3 = in(reg) rsp3,
