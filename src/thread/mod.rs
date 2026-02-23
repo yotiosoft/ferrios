@@ -23,7 +23,6 @@ pub enum ThreadState {
 #[derive(Debug, Clone, Copy)]
 pub struct Thread {
     pub tid: usize,             // Thread ID
-    pub pid: usize,             // Process ID (user process only)
     pub state: ThreadState,     // スレッドの状態
     pub context: Context,       // スレッドのコンテキスト
     pub kstack: u64,            // このスレッド用のカーネルスタック
@@ -33,7 +32,6 @@ impl Thread {
     pub fn new() -> Self {
         Thread {
             tid: 0,
-            pid: 0,
             state: ThreadState::Unused,
             context: Context::new(),
             kstack: 0,

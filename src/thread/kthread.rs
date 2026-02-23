@@ -1,4 +1,3 @@
-use crate::scheduler;
 use super::{ STACK_SIZE, THREAD_TABLE, ThreadState };
 
 pub const NTHREAD: usize = 64;

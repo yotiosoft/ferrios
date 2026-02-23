@@ -83,16 +83,16 @@ pub fn create_user_process(code: &[u8], mapper: &mut impl Mapper<Size4KiB>, fram
     };
     let kstack_top = kstack as u64 + STACK_SIZE as u64;
 
-    // Process ID を決定
-    let pid = next_pid()?;
-
     // init thread を作成
-    let thread = uthread::create_user_thread(pid, kstack_top);
+    let thread = uthread::create_user_thread(kstack_top);
 
     // Thread Table に追加
     let tid = thread.tid;
     let mut thread_table = THREAD_TABLE.lock();
     thread_table[tid] = thread;
+
+    // Process ID を決定
+    let pid = next_pid()?;
 
     // Process 構造体を作成
     let mut process = Process {

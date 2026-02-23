@@ -1,14 +1,13 @@
 use super::{ THREAD_TABLE, USER_STACK_TOP, USER_CODE_START, ThreadState };
 use crate::{gdt, thread::Thread};
 
-pub fn create_user_thread(pid: usize, kstack_top: u64) -> Thread {
+pub fn create_user_thread(kstack_top: u64) -> Thread {
     // スレッド ID を確保
     let tid = super::super::next_tid().expect("Thread table is full");
 
     // スレッドテーブルに追加
     let mut thread = Thread::new();
     thread.tid = tid;
-    thread.pid = pid;
     thread.state = ThreadState::Runnable;
     thread.kstack = kstack_top;
 
