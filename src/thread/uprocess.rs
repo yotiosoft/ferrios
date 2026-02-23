@@ -1,10 +1,9 @@
-use core::slice::SliceIndex;
-
 use x86_64::{ VirtAddr, structures::paging::{ FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB } };
 use lazy_static::lazy_static;
-use crate::gdt;
 
 use super::{ STACK_SIZE, THREAD_TABLE, ThreadState };
+
+mod uthread;
 
 /// ユーザコード
 pub const USER_CODE_START: u64 = 0x0000_1000_0000_0000;
@@ -19,9 +18,6 @@ lazy_static! {
 }
 
 pub fn create_user_process(code: &[u8], mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl FrameAllocator<Size4KiB>) -> Result<(), &'static str> {
-    // スレッド ID を確保
-    let tid = super::next_tid().expect("Thread table is full");
-
     // ユーザページのフラグ
     let user_flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
 
@@ -52,50 +48,16 @@ pub fn create_user_process(code: &[u8], mapper: &mut impl Mapper<Size4KiB>, fram
     };
     let kstack_top = kstack as u64 + STACK_SIZE as u64;
 
+    // Process ID を決定
+    let pid = 0;
+
+    // init thread を作成
+    let thread = uthread::create_user_thread(pid, kstack_top);
+
+    // Thread Table に追加
+    let tid = thread.tid;
     let mut table = THREAD_TABLE.lock();
-    let mut pid = NEXT_PID.lock();
-    table[tid].tid = tid;
-    table[tid].pid = *pid;
-    table[tid].state = ThreadState::Runnable;
-    table[tid].kstack = kstack_top;
-
-    // コンテキストを初期化する
-    table[tid].context.rsp = kstack_top;
-    table[tid].context.rip = ring3_entry_trampoline as u64;
-    table[tid].context.rflags = 0x200;  // IF (Interrupt Flag) を有効化
-    table[tid].context.cs = gdt::GDT.1.user_code_selector.0 as u64;
-    table[tid].context.ss = gdt::GDT.1.user_data_selector.0 as u64;
-    table[tid].context.rsp3 = USER_STACK_TOP;
-
-    *pid += 1;
+    table[tid] = thread;
 
     Ok(())
-}
-
-unsafe extern "C" fn ring3_entry_trampoline() -> ! {
-    let (cs, ss, rsp3, rip) = {
-        let table = THREAD_TABLE.lock();
-        let ctx =&table[super::current_tid().expect("No running thread")].context;
-        (ctx.cs, ctx.ss, ctx.rsp3, USER_CODE_START)
-    };
-
-    unsafe {
-        core::arch::asm!(
-            "mov ds, ax",
-            "mov es, ax",
-            "push rax",
-            "push {rsp3}",
-            "push {rflags}",
-            "push {cs}",
-            "push {rip}",
-            "iretq",            // switch: cs, ss, rsp, rflags
-            inout("ax") ss => _,
-            cs = in(reg) cs,
-            rsp3 = in(reg) rsp3,
-            rflags = in(reg) 0x202u64,
-            rip = in(reg) rip,
-        );
-    }
-
-    loop {}
 }
