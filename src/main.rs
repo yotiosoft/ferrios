@@ -107,9 +107,14 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     // ユーザプロセス作成
     const USER_CODE: &[u8] = &[
-        0x48, 0x31, 0xC0,           // xor rax, rax
-        0x48, 0xFF, 0xC0,           // inc rax
-        0xEB, 0xFB,                 // jmp -5
+        // mov rax, 0        (syscall番号: SYS_PRINT_NUM)
+        0x48, 0xC7, 0xC0, 0x00, 0x00, 0x00, 0x00,
+        // mov rdi, 42       (引数1: 表示する数値)
+        0x48, 0xC7, 0xC7, 0x2A, 0x00, 0x00, 0x00,
+        // syscall
+        0x0F, 0x05,
+        // jmp -18           (ループ)
+        0xEB, 0xEE,
     ];
 
     thread::uprocess::create_user_process(USER_CODE, &mut mapper, &mut frame_allocator).expect("failed to create user process");

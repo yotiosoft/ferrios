@@ -1,5 +1,5 @@
 use super::exit::*;
-use super::super::{ gdt, interrupts, serial_println };
+use super::super::{ gdt, interrupts, syscall, serial_println };
 use crate::hlt_loop;
 use core::panic::PanicInfo;
 
@@ -20,6 +20,7 @@ pub fn init() {
         let mask = port.read();
         port.write(mask & !(1 << 4));
     }
+    syscall::init(); 
     x86_64::instructions::interrupts::enable();
 }
 

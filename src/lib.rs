@@ -16,6 +16,7 @@ pub mod thread;
 pub mod cpu;
 pub mod console;
 pub mod scheduler;
+pub mod syscall;
 
 mod libbackend;
 pub use libbackend::exit::*;
