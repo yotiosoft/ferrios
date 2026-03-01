@@ -45,6 +45,9 @@ impl super::Scheduler for RoundRobin {
                         let old_context = &mut cpu.scheduler as *mut Context;
                         let new_context = &table[next_tid].context as *const Context;
 
+                        // CPU の syscall_rsp をスレッドの kstack に変更
+                        cpu.kernel_syscall_rsp = table[next_tid].kstack;
+
                         drop(cpu);
                         drop(table);
 

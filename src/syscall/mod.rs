@@ -17,7 +17,7 @@ pub fn init() -> Result<(), &'static str> {
     // syscall handler のアドレスを LSTAR に登録
     LStar::write(VirtAddr::new(syscall_entry as u64));
 
-    // CC/SS セグメントを START に設定
+    // CC/SS セグメントを STAR に設定
     Star::write(
         gdt::GDT.1.user_code_selector,
         gdt::GDT.1.user_data_selector,
@@ -103,12 +103,12 @@ pub const SYS_PRINT_STR: u64 = 1;
 /// Rustから呼ばれるディスパッチャ
 /// 戻り値はRAXに入る
 #[unsafe(no_mangle)]
-pub extern "C" fn syscall_dispatch(nr: u64, arg1: u64, arg2: u64, arg3: u64) -> u64 {
-    match nr {
+pub extern "C" fn syscall_dispatch(syscall_num: u64, arg1: u64, arg2: u64, arg3: u64) -> u64 {
+    match syscall_num {
         SYS_PRINT_NUM => sys_print_num(arg1),
         SYS_PRINT_STR => sys_print_str(arg1, arg2),
         _ => {
-            crate::println!("[syscall] unknown syscall: {}", nr);
+            crate::println!("[syscall] unknown syscall: {}", syscall_num);
             u64::MAX  // エラー
         }
     }
