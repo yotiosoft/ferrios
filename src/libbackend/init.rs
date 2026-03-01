@@ -20,7 +20,6 @@ pub fn init() {
         let mask = port.read();
         port.write(mask & !(1 << 4));
     }
-    syscall::init(); 
     x86_64::instructions::interrupts::enable();
 }
 

@@ -4,11 +4,19 @@ use x86_64::VirtAddr;
 use crate::gdt;
 use core::arch::naked_asm;
 
-static mut SYSCALL_STACK: [u8; 4096 * 4] = [0; 4096 * 4];
+#[unsafe(link_section = ".bss")]
 static mut SAVED_USER_RSP: u64 = 0;
+
+#[unsafe(link_section = ".data")]
 static mut KERNEL_SYSCALL_RSP_TOP: u64 = 0;
 
-pub fn init() {
+static mut SYSCALL_STACK: [u8; 4096 * 4] = [0; 4096 * 4];
+
+static mut DEBUG_R11: u64 = 0;
+static mut DEBUG_RDI: u64 = 0;
+static mut DEBUG_RCX: u64 = 0;
+
+pub fn init() -> Result<(), &'static str> {
     unsafe {
         Efer::update(|flags| *flags |= EferFlags::SYSTEM_CALL_EXTENSIONS);
     }
@@ -17,43 +25,39 @@ pub fn init() {
     LStar::write(VirtAddr::new(syscall_entry as u64));
 
     // CC/SS セグメントを START に設定
-    let user_cs_ring0 = SegmentSelector(gdt::GDT.1.user_code_selector.0 & !0b11);
-    let user_ss_ring0 = SegmentSelector(gdt::GDT.1.user_data_selector.0 & !0b11);
     Star::write(
-        user_cs_ring0,
-        user_ss_ring0,
+        gdt::GDT.1.user_code_selector,
+        gdt::GDT.1.user_data_selector,
         gdt::GDT.1.kernel_code_selector,
         gdt::GDT.1.kernel_data_selector,
-    ).unwrap();
+    )?;
 
     // カーネル用 syscall スタックをセット
-    let stack_top = core::ptr::addr_of!(SYSCALL_STACK) as u64 + (4096 * 4);
+    let stack_top = core::ptr::addr_of!(SYSCALL_STACK) as u64 + (4096 * 4) - 8;
     unsafe {
         KERNEL_SYSCALL_RSP_TOP = stack_top;
     }
 
     // syscall 呼び出し時に IF をクリアさせる
     SFMask::write(x86_64::registers::rflags::RFlags::INTERRUPT_FLAG);
+
+    Ok(())
 }
 
 #[unsafe(naked)]
 unsafe extern "C" fn syscall_entry() {
-    // RSP を切り替える
-    // ユーザの RSP3 を対比して kstack に切り替え
-    // TSS の RSP0 を読み出す
     naked_asm!(
-        // カーネル用 syscall スタックに切り替え
+        // ユーザ RSP を退避し、カーネルスタックに切り替え
         "mov [{user_rsp}], rsp",
         "mov rsp, [{kernel_rsp}]",
 
-        // rsp3 をカーネルの GS に退避
-        "mov gs:[0], rsp",
-        "mov rsp, gs:[8]",
+        // push する前に syscall番号を別レジスタに退避
+        "mov r10, rax",
 
-        // カーネルスタックにレジスタを退避
-        "push rcx",
-        "push r11",
-        "push rax",
+        // レジスタを退避
+        "push rcx",   // sysretq 用 RIP
+        "push r11",   // sysretq 用 RFLAGS
+        "push rax",   // syscall 番号
         "push rdi",
         "push rsi",
         "push rdx",
@@ -64,11 +68,10 @@ unsafe extern "C" fn syscall_entry() {
         "push r14",
         "push r15",
 
-        // syscall handler を呼ぶ
-        "mov rdi, rax",
-        "mov rsi, [rsp + 8*8]",
-        "mov rdx, [rsp + 7*8]",
-        "mov rcx, [rsp + 6*8]",
+        // syscall_dispatch(number=rax, arg0=rdi, arg1=rsi, arg2=rdx)
+        // 引数は rdi, rsi, rdx に入っている
+        "mov rdi, r10",
+        // rsi, rdx はユーザが設定した値がそのまま残っている
         "call {syscall_dispatch}",
 
         // レジスタを復元
@@ -85,16 +88,22 @@ unsafe extern "C" fn syscall_entry() {
         "pop r11",
         "pop rcx",
 
-        // rsp3 を復元
+        "mov [{debug_r11}], r11",
+        "mov [{debug_rdi}], rdi",   // sysretq直前のrdiを保存
+        "mov [{debug_rcx}], rcx",
+
+        // ユーザ RSP を復元
         "mov rsp, [{user_rsp}]",
-        "swapgs",
 
         // ユーザモードに戻る
         "sysretq",
 
-        user_rsp    = sym SAVED_USER_RSP,
-        kernel_rsp  = sym KERNEL_SYSCALL_RSP_TOP,
+        user_rsp         = sym SAVED_USER_RSP,
+        kernel_rsp       = sym KERNEL_SYSCALL_RSP_TOP,
         syscall_dispatch = sym syscall_dispatch,
+        debug_r11        = sym DEBUG_R11,
+        debug_rdi        = sym DEBUG_RDI,
+        debug_rcx        = sym DEBUG_RCX,
     )
 }
 
@@ -106,6 +115,19 @@ pub const SYS_PRINT_STR: u64 = 1;
 /// 戻り値はRAXに入る
 #[unsafe(no_mangle)]
 pub extern "C" fn syscall_dispatch(nr: u64, arg1: u64, arg2: u64, arg3: u64) -> u64 {
+    let (raw_r11, raw_rcx, raw_rdi) = unsafe {
+        (
+            core::ptr::read(core::ptr::addr_of!(DEBUG_R11)),
+            core::ptr::read(core::ptr::addr_of!(DEBUG_RCX)),
+            core::ptr::read(core::ptr::addr_of!(DEBUG_RDI)),
+        )
+    };
+    crate::println!("[debug] raw_r11={} raw_rcx={} raw_rdi={} arg1={}", raw_r11, raw_rcx, raw_rdi, arg1);
+    crate::println!("[debug] SAVED_USER_RSP addr={:#x} KERNEL_SYSCALL_RSP_TOP addr={:#x}",
+        core::ptr::addr_of!(SAVED_USER_RSP) as u64,
+        core::ptr::addr_of!(KERNEL_SYSCALL_RSP_TOP) as u64,
+    );
+
     match nr {
         SYS_PRINT_NUM => sys_print_num(arg1),
         SYS_PRINT_STR => sys_print_str(arg1, arg2),

@@ -20,6 +20,7 @@ use ferrios::task::{ Task, executor::Executor };
 use ferrios::thread;
 use ferrios::scheduler;
 use ferrios::console;
+use ferrios::syscall;
 
 entry_point!(kernel_main);
 
@@ -33,6 +34,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     print!("Initializing..");
     ferrios::init();
+    syscall::init().expect("syscall init error");
     console::init();
     scheduler::init(Box::new(scheduler::round_robin::RoundRobin));
     println!("done.");
