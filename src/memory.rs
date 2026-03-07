@@ -109,3 +109,38 @@ fn translate_addr_inner(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Opt
     // 目的の物理アドレスを計算
     Some(frame.start_address() + u64::from(addr.page_offset()))
 }
+
+/// ユーザ用ページテーブルを作成する
+/// カーネル領域は現在（カーネル）のページテーブルからコピーする
+pub unsafe fn create_user_page_table(frame_allocator: &mut impl FrameAllocator<Size4KiB>, physical_memory_offset: VirtAddr) -> Option<(OffsetPageTable<'static>, PhysFrame)> {
+    // 新しい level-4 フレームを allocate
+    let new_frame = frame_allocator.allocate_frame()?;
+
+    // 新しいページテーブルを初期化
+    let new_table_va = physical_memory_offset + new_frame.start_address().as_u64();
+    let new_table_ptr: *mut PageTable = new_table_va.as_mut_ptr();
+    unsafe {
+        new_table_ptr.write(PageTable::new());
+    }
+
+    // カーネル用領域: 256-511 をコピー
+    let (current_frame, _) = x86_64::registers::control::Cr3::read();
+    let current_va = physical_memory_offset + current_frame.start_address().as_u64();
+    let current_table_ptr: *const PageTable = current_va.as_ptr();
+    let current_table = unsafe {
+        &*current_table_ptr
+    };
+    let new_table = unsafe {
+        &mut *new_table_ptr
+    };
+
+    for i in 256..512 {
+        new_table[i] = current_table[i].clone();
+    }
+
+    let new_page_table = unsafe {
+        OffsetPageTable::new(&mut *new_table_ptr, physical_memory_offset)
+    };
+
+    Some((new_page_table, new_frame))
+}
