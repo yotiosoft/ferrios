@@ -138,7 +138,7 @@ pub unsafe fn create_user_page_table(frame_allocator: &mut impl FrameAllocator<S
         new_table_ptr.write(PageTable::new());
     }
 
-    // カーネル用領域: 256-511 をコピー
+    // カーネル用領域 をコピー
     let (current_frame, _) = x86_64::registers::control::Cr3::read();
     let current_va = physical_memory_offset + current_frame.start_address().as_u64();
     let current_table_ptr: *const PageTable = current_va.as_ptr();
@@ -149,9 +149,19 @@ pub unsafe fn create_user_page_table(frame_allocator: &mut impl FrameAllocator<S
         &mut *new_table_ptr
     };
 
-    for i in 256..512 {
+    for i in 0..512 {
         new_table[i] = current_table[i].clone();
     }
+    
+    for i in 0..512 {
+    if !current_table[i].is_unused() {
+        crate::println!("entry[{}]: current={:#x} new={:#x}",
+            i,
+            current_table[i].addr().as_u64(),
+            new_table[i].addr().as_u64()
+        );
+    }
+}
 
     let new_page_table = unsafe {
         OffsetPageTable::new(&mut *new_table_ptr, physical_memory_offset)
