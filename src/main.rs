@@ -113,7 +113,7 @@ fn kernel_thread_0() -> ! {
         println!("Thread 0 running: {}", count);
         count = count + 1;
         
-        for _ in 0..1000000 {
+        for _ in 0..100000000 {
             unsafe { core::arch::asm!("nop"); }
         }
     }
@@ -125,7 +125,7 @@ fn kernel_thread_1() -> ! {
         println!("Thread 1 running: {}", count);
         count = count + 1;
         
-        for _ in 0..1000000 {
+        for _ in 0..100000000 {
             unsafe { core::arch::asm!("nop"); }
         }
     }
@@ -137,7 +137,7 @@ fn kernel_thread_2() -> ! {
         println!("Thread 2 running: {}", count);
         count = count + 1;
         
-        for _ in 0..1000000 {
+        for _ in 0..100000000 {
             unsafe { core::arch::asm!("nop"); }
         }
     }

@@ -1,11 +1,13 @@
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
+use bootloader_api::info::FrameBuffer;
 
 use crate::libbackend::test;
 
 pub mod serial;
 pub mod vga_buffer;
+pub mod framebuffer;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConsoleMode {
@@ -23,7 +25,7 @@ pub struct Console {
 impl Console {
     const fn new() -> Self {
         Console {
-            mode: ConsoleMode::Serial,
+            mode: ConsoleMode::Both,
         }
     }
 
@@ -49,7 +51,7 @@ impl Console {
 
     pub fn update_mode(&mut self) {
         self.mode = if Self::is_serial_avaiable() {
-            ConsoleMode::Serial
+            ConsoleMode::Both
         }
         else {
             ConsoleMode::Vga
@@ -61,9 +63,13 @@ lazy_static! {
     pub static ref CONSOLE: Mutex<Console> = Mutex::new(Console::new());
 }
 
-pub fn init() {
+pub fn init<'f>(framebuffer: &'f mut Option<FrameBuffer>) {
     let mut console = CONSOLE.lock();
     console.update_mode();
+
+    if let Some(fb) = framebuffer.as_mut() {
+        framebuffer::init(fb);
+    }
 }
 
 pub fn _print(args: fmt::Arguments) {
